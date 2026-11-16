@@ -184,3 +184,11 @@ INSERT INTO settings(key,value) VALUES ('topics_seeded','1') ON CONFLICT (key) D
 
 UPDATE products SET topic_id=(SELECT id FROM topics WHERE title='AI for Business'), content_type='course'
 WHERE name='AI Business Course' AND content_type='product' AND topic_id IS NULL;
+
+
+-- ---------- v4: tab passes (Rs 199 per tab) and All Tabs Access (Rs 999) ----------
+ALTER TABLE topics ADD COLUMN IF NOT EXISTS price NUMERIC(10,2) NOT NULL DEFAULT 199;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS topic_id INT REFERENCES topics(id) ON DELETE SET NULL;
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_item_type_check;
+ALTER TABLE orders ADD CONSTRAINT orders_item_type_check CHECK (item_type IN ('plan','product','topic','all_access'));
+INSERT INTO settings(key, value) VALUES ('all_access_price', '999') ON CONFLICT (key) DO NOTHING;

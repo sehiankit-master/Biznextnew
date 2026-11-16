@@ -3,7 +3,8 @@
   if (!(await BN.requireLogin())) return;
   const esc = BN.esc;
   const q = new URLSearchParams(location.search);
-  const type = q.get('type') === 'plan' ? 'plan' : 'product';
+  const type = ['plan', 'topic', 'all_access'].includes(q.get('type')) ? q.get('type') : 'product';
+  const isPass = type === 'topic' || type === 'all_access';
   const id = parseInt(q.get('id'), 10) || 0;
   const root = document.getElementById('root');
 
@@ -13,6 +14,12 @@
     if (type === 'plan') {
       const { plans } = await BN.api('/api/plans');
       item = plans.find((p) => p.id === id);
+    } else if (type === 'topic') {
+      const t = (await BN.api('/api/topics/' + id)).topic;
+      item = { name: 'Tab Pass: ' + t.title, price: t.price, features: 'Open every e-book, PDF and video in this tab\nOne-time payment' };
+    } else if (type === 'all_access') {
+      const d = await BN.api('/api/topics');
+      item = { name: 'All Tabs Access', price: d.all_access_price, features: 'Unlock every tab on the main page\nOne-time payment' };
     } else {
       item = (await BN.api('/api/products/' + id)).product;
     }
@@ -96,7 +103,7 @@
             const v = await BN.api('/api/payments/razorpay/verify', { method: 'POST', body: { order_id: r.orderId, ...resp } });
             if (v.status === 'paid') {
               root.innerHTML = `<div class="card" style="max-width:560px;margin:40px auto;text-align:center"><div style="font-size:56px">✅</div><h2>Payment successful</h2>
-                <p style="color:var(--muted);margin:8px 0 18px">Your order is confirmed${type === 'product' ? ' and your product is ready in your dashboard.' : '. Our team will contact you on WhatsApp / email to start your setup.'}</p>
+                <p style="color:var(--muted);margin:8px 0 18px">Your order is confirmed${type === 'product' ? ' and your product is ready in your dashboard.' : isPass ? ' and your access is unlocked. Open the tab from the main page.' : '. Our team will contact you on WhatsApp / email to start your setup.'}</p>
                 <a class="btn btn-primary" href="/dashboard.html">Go to Dashboard</a></div>`;
             } else BN.msg(msg, v.error || 'Payment is being confirmed. Check your dashboard in a few minutes.');
           } catch (err) { BN.msg(msg, err.message + ' If money was deducted, it will be confirmed automatically — check your dashboard or contact support.'); }

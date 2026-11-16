@@ -8,11 +8,16 @@
   const bg = document.getElementById('modalBg');
   const body = document.getElementById('modalBody');
   let data = null, filter = 'all';
+  const LOCK = '<svg viewBox="0 0 24 24"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V11a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 8V6a3 3 0 1 1 6 0v3H9z"/></svg>';
 
   function closeModal() { bg.classList.remove('show'); body.innerHTML = ''; }
   bg.onclick = (e) => { if (e.target === bg) closeModal(); };
 
   function render() {
+    const banner = document.getElementById('lockBanner');
+    banner.innerHTML = data.access ? '' : `<div class="lockbox"><div><h3>${LOCK} This tab is locked</h3><p style="color:var(--muted);font-size:14px;margin-top:4px">Buy a pass to open every e-book, PDF and video in it.</p></div>
+      <div class="actions"><a class="btn btn-gold" href="/checkout.html?type=topic&id=${data.topic.id}">Unlock this tab - ${BN.inr(data.topic.price)}</a>
+      <a class="btn btn-primary" href="/checkout.html?type=all_access&id=0">All tabs - ${BN.inr(data.all_access_price)}</a></div></div>`;
     const items = data.items.filter((i) => filter === 'all' || i.content_type === filter);
     const types = [...new Set(data.items.map((i) => i.content_type))];
     chipsEl.innerHTML = types.length > 1
@@ -22,13 +27,14 @@
     grid.innerHTML = items.length ? items.map((i) => {
       const img = i.image_url ? `<img src="${esc(i.image_url)}" alt="" loading="lazy">` : `<span style="font-size:22px;font-weight:800">${LABEL[i.content_type] || 'Item'}</span>`;
       const desc = esc(i.description || '').slice(0, 120);
-      return `<div class="card pcard"><div class="pimg">${img}</div><div class="pbody">
+      const open = i.owned || (i.is_free && true);
+      return `<div class="card pcard${open ? '' : ' locked'}"><div class="pimg">${img}${open ? '' : `<span class="lk">${LOCK}</span>`}</div><div class="pbody">
         <div class="pcat">${LABEL[i.content_type] || 'Product'}</div><h3>${esc(i.name)}</h3><p>${desc}</p>
-        <div>${i.is_free ? '<span class="tag ok">Free</span>' : i.owned ? '<span class="tag ok">Purchased</span>' : ''}</div>
-        <div class="pprice">${i.is_free ? 'Free' : BN.inr(i.price)}</div>
-        <div class="pfoot">${i.owned || i.is_free
+        <div>${i.is_free ? '<span class="tag ok">Free sample</span>' : i.owned ? '<span class="tag ok">Unlocked</span>' : '<span class="tag warn">Locked</span>'}</div>
+        <div class="pprice" style="font-size:16px">${i.is_free ? 'Free sample' : open ? 'Unlocked' : 'Locked'}</div>
+        <div class="pfoot">${open
           ? `<button class="btn btn-gold btn-sm" data-open="${i.id}">Open</button>`
-          : `<a class="btn btn-primary btn-sm" href="/checkout.html?type=product&id=${i.id}">Buy ${BN.inr(i.price)}</a>`}</div></div></div>`;
+          : `<a class="btn btn-primary btn-sm" href="/checkout.html?type=topic&id=${data.topic.id}">Unlock ${BN.inr(data.topic.price)}</a>`}</div></div></div>`;
     }).join('') : '<div class="empty" style="grid-column:1/-1">Content for this tab is coming soon. Message us on WhatsApp for updates.</div>';
     grid.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => openItem(b.dataset.open)));
   }

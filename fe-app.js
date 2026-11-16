@@ -136,10 +136,10 @@
         <h3>${BN.esc(p.name)}</h3>
         <p>${desc}${(p.description || '').length > 110 ? '…' : ''}</p>
         <div>${resell}</div>
-        <div class="pprice">${p.is_free ? 'Free' : BN.inr(p.price)}</div>
+        <div class="pprice">${p.is_free ? 'Free sample' : (p.topic_id && Number(p.price) <= 0) ? 'Tab pass' : BN.inr(p.price)}</div>
         <div class="pfoot">
           <a class="btn btn-outline btn-sm js-detail" data-id="${p.id}" href="/products.html?open=${p.id}">Details</a>
-          ${p.is_free && p.topic_id ? `<a class="btn btn-gold btn-sm" href="/topic.html?id=${p.topic_id}">Open free</a>` : `<a class="btn btn-primary btn-sm" href="/checkout.html?type=product&id=${p.id}">Buy Now</a>`}
+          ${(p.topic_id && (p.is_free || Number(p.price) <= 0)) ? `<a class="btn btn-gold btn-sm" href="/topic.html?id=${p.topic_id}">Open in tab</a>` : `<a class="btn btn-primary btn-sm" href="/checkout.html?type=product&id=${p.id}">Buy Now</a>`}
         </div>
       </div></div>`;
   };

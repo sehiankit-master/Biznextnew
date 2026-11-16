@@ -45,8 +45,12 @@
   }
 
   async function renderProducts() {
-    const { products } = await BN.api('/api/my/products');
-    main.innerHTML = `<h2 style="margin-bottom:12px">Purchased Products</h2>` + (products.length
+    const [{ products }, acc] = await Promise.all([BN.api('/api/my/products'), BN.api('/api/my/access')]);
+    const accessHtml = `<div class="panel"><h3>My tab access</h3>${acc.all ? '<p><span class="tag ok">All tabs unlocked</span></p>'
+      : acc.topics.length ? `<div class="actions">${acc.topics.map((t) => `<a class="btn btn-outline btn-sm" href="/topic.html?id=${t.id}">${esc(t.title)}</a>`).join('')}</div>`
+      : '<p style="color:var(--muted)">No tabs unlocked yet.</p>'}
+      ${acc.all ? '' : '<p style="margin-top:12px"><a class="btn btn-gold btn-sm" href="/">Unlock tabs</a></p>'}</div>`;
+    main.innerHTML = accessHtml + `<h2 style="margin-bottom:12px">Purchased Products</h2>` + (products.length
       ? `<div class="grid g2">${products.map((p) => `<div class="card">
           <h3>${esc(p.name)}</h3><p style="color:var(--muted);font-size:14px;margin:6px 0">Purchased ${BN.date(p.paid_at)}</p>
           <p style="margin-bottom:10px"><b>Reselling:</b> ${p.resell_allowed ? '<span class="tag ok">Allowed</span> ' + esc(p.resell_info) : '<span class="tag gray">Not available</span>'}</p>

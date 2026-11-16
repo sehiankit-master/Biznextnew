@@ -549,14 +549,25 @@ app.post(
   requireAuth,
   checkoutLimiter,
   ah(async (req, res) => {
-    const type = req.body.type === 'plan' ? 'plan' : 'product';
+    const type = ['plan', 'topic', 'all_access'].includes(req.body.type) ? req.body.type : 'product';
     const id = parseInt(req.body.id, 10) || 0;
     const method = req.body.method === 'manual' ? 'manual' : 'razorpay';
     const details = cleanStr(req.body.details, 1000);
     const s = await getSettings();
 
     let item;
-    if (type === 'plan') {
+    if (type === 'topic') {
+      const t = (await query('SELECT id,title,price FROM topics WHERE id=$1 AND is_active', [id])).rows[0];
+      if (t) {
+        const pa = await passAccess(req.user.id);
+        if (pa.all || pa.topics.has(t.id)) return res.status(409).json({ error: 'This tab is already unlocked for you.' });
+        item = { id: t.id, name: 'Tab Pass: ' + t.title, price: t.price };
+      }
+    } else if (type === 'all_access') {
+      const pa = await passAccess(req.user.id);
+      if (pa.all) return res.status(409).json({ error: 'You already have access to all tabs.' });
+      item = { id: 0, name: 'All Tabs Access', price: Number(s.all_access_price || 999) };
+    } else if (type === 'plan') {
       item = (await query('SELECT id,name,price FROM plans WHERE id=$1 AND is_active', [id])).rows[0];
     } else {
       item = (await query('SELECT id,name,price,file_name FROM products WHERE id=$1 AND is_active', [id])).rows[0];
@@ -574,9 +585,9 @@ app.post(
 
     // Price always comes from the database - never from the browser.
     const ins = await query(
-      `INSERT INTO orders(user_id,item_type,product_id,plan_id,item_name,amount,method,status,details)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8) RETURNING *`,
-      [req.user.id, type, type === 'product' ? id : null, type === 'plan' ? id : null, item.name, item.price, method, details || null]
+      `INSERT INTO orders(user_id,item_type,product_id,plan_id,item_name,amount,method,status,details,topic_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9) RETURNING *`,
+      [req.user.id, type, type === 'product' ? id : null, type === 'plan' ? id : null, item.name, item.price, method, details || null, type === 'topic' ? id : null]
     );
     const order = ins.rows[0];
 
@@ -742,11 +753,26 @@ app.get(
   })
 );
 
-// Access rule for content: free + visible items need only a login; everything else needs a verified paid order.
+// Which tab passes the user owns (a verified paid order is required).
+async function passAccess(userId) {
+  const out = { all: false, topics: new Set() };
+  if (!userId) return out;
+  const { rows } = await query(
+    "SELECT item_type, topic_id FROM orders WHERE user_id=$1 AND status='paid' AND item_type IN ('topic','all_access')",
+    [userId]
+  );
+  rows.forEach((r) => {
+    if (r.item_type === 'all_access') out.all = true;
+    else if (r.topic_id) out.topics.add(r.topic_id);
+  });
+  return out;
+}
+
+// Access rule for content: free samples need only a login; everything else needs the tab pass, All Tabs Access, or a paid order for that exact item.
 async function accessProduct(userId, pid) {
   const p = (
     await query(
-      'SELECT id,name,content_type,is_free,is_active,file_name,file_original,delivery_link,video_url FROM products WHERE id=$1',
+      'SELECT id,name,topic_id,content_type,is_free,is_active,file_name,file_original,delivery_link,video_url FROM products WHERE id=$1',
       [pid]
     )
   ).rows[0];
@@ -755,18 +781,26 @@ async function accessProduct(userId, pid) {
   const o = (
     await query("SELECT id FROM orders WHERE user_id=$1 AND product_id=$2 AND status='paid' ORDER BY paid_at DESC LIMIT 1", [userId, pid])
   ).rows[0];
-  return o ? { p, orderId: o.id } : null;
+  if (o) return { p, orderId: o.id };
+  if (p.topic_id && p.is_active) {
+    const pa = await passAccess(userId);
+    if (pa.all || pa.topics.has(p.topic_id)) return { p, orderId: null };
+  }
+  return null;
 }
 
 app.get(
   '/api/topics',
   ah(async (req, res) => {
     const { rows } = await query(
-      `SELECT t.id, t.title, t.icon_url, COUNT(p.id) FILTER (WHERE p.is_active)::int AS items
+      `SELECT t.id, t.title, t.icon_url, t.price::float AS price, COUNT(p.id) FILTER (WHERE p.is_active)::int AS items
        FROM topics t LEFT JOIN products p ON p.topic_id=t.id
        WHERE t.is_active GROUP BY t.id ORDER BY t.sort_order, t.id`
     );
-    res.json({ topics: rows });
+    const pa = await passAccess(req.user && req.user.id);
+    rows.forEach((t) => (t.locked = !(pa.all || pa.topics.has(t.id))));
+    const st = await getSettings();
+    res.json({ topics: rows, all_access: pa.all, all_access_price: Number(st.all_access_price || 999) });
   })
 );
 
@@ -774,23 +808,36 @@ app.get(
   '/api/topics/:id',
   ah(async (req, res) => {
     const id = parseInt(req.params.id, 10) || 0;
-    const topic = (await query('SELECT id,title,icon_url FROM topics WHERE id=$1 AND is_active', [id])).rows[0];
+    const topic = (await query('SELECT id,title,icon_url,price::float AS price FROM topics WHERE id=$1 AND is_active', [id])).rows[0];
     if (!topic) return res.status(404).json({ error: 'Tab not found' });
     const { rows: items } = await query(
       `SELECT p.id,p.name,p.description,p.price,p.image_url,p.content_type,p.is_free
        FROM products p WHERE p.topic_id=$1 AND p.is_active ORDER BY p.created_at DESC`,
       [id]
     );
-    let owned = new Set();
+    const pa = await passAccess(req.user && req.user.id);
+    const access = pa.all || pa.topics.has(id);
+    let direct = new Set();
     if (req.user && items.length) {
       const o = await query("SELECT DISTINCT product_id FROM orders WHERE user_id=$1 AND status='paid' AND product_id = ANY($2::int[])", [
         req.user.id,
         items.map((i) => i.id),
       ]);
-      owned = new Set(o.rows.map((r) => r.product_id));
+      direct = new Set(o.rows.map((r) => r.product_id));
     }
-    items.forEach((i) => (i.owned = i.is_free ? !!req.user : owned.has(i.id)));
-    res.json({ topic, items });
+    items.forEach((i) => (i.owned = access || direct.has(i.id) || (i.is_free && !!req.user)));
+    const st = await getSettings();
+    res.json({ topic, items, access, all_access: pa.all, all_access_price: Number(st.all_access_price || 999) });
+  })
+);
+
+app.get(
+  '/api/my/access',
+  requireAuth,
+  ah(async (req, res) => {
+    const pa = await passAccess(req.user.id);
+    const { rows } = await query('SELECT id,title FROM topics WHERE is_active ORDER BY sort_order, id');
+    res.json({ all: pa.all, topics: rows.filter((t) => pa.all || pa.topics.has(t.id)) });
   })
 );
 
@@ -950,7 +997,7 @@ function productFields(b) {
   const videoUrl = cleanStr(b.video_url, 500);
   if (videoUrl && !/^https:\/\/\S+$/.test(videoUrl)) throw Object.assign(new Error('Video link must start with https://'), { status: 400 });
   if (bool(b.is_free) && !(parseInt(b.topic_id, 10) > 0)) throw Object.assign(new Error('Choose a Home tab for free content'), { status: 400 });
-  if (!bool(b.is_free) && !(price > 0)) throw Object.assign(new Error('Price must be more than 0 (or tick Free)'), { status: 400 });
+  if (!bool(b.is_free) && !(parseInt(b.topic_id, 10) > 0) && !(price > 0)) throw Object.assign(new Error('Price must be more than 0, or choose a Home tab (items in a tab open with the tab pass)'), { status: 400 });
   const link = cleanStr(b.delivery_link, 500);
   if (link && !/^https:\/\/\S+$/.test(link)) throw Object.assign(new Error('Course / delivery link must start with https://'), { status: 400 });
   return {
@@ -1186,6 +1233,11 @@ admin.put(
       if (u && !/^[\w.\-]{2,}@[A-Za-z]{2,}$/.test(u)) return res.status(400).json({ error: 'Enter a valid UPI ID like name@bank' });
       await setSetting('upi_id', u);
     }
+    if (b.all_access_price !== undefined) {
+      const n = Number(b.all_access_price);
+      if (!(n > 0) || n > 1000000) return res.status(400).json({ error: 'Enter a valid price' });
+      await setSetting('all_access_price', String(n));
+    }
     if (b.manual_enabled !== undefined) await setSetting('manual_enabled', bool(b.manual_enabled) ? 'true' : 'false');
     for (const k of ['company_name', 'tagline', 'support_email', 'payment_instructions', 'invoice_note']) {
       if (b[k] !== undefined) await setSetting(k, cleanStr(b[k], 1000));
@@ -1239,7 +1291,7 @@ admin.get(
   '/topics',
   ah(async (req, res) => {
     const { rows } = await query(
-      `SELECT t.id,t.title,t.icon_url,t.sort_order,t.is_active, COUNT(p.id)::int AS items
+      `SELECT t.id,t.title,t.icon_url,t.sort_order,t.is_active,t.price::float AS price, COUNT(p.id)::int AS items
        FROM topics t LEFT JOIN products p ON p.topic_id=t.id GROUP BY t.id ORDER BY t.sort_order, t.id`
     );
     res.json({ topics: rows });
@@ -1250,15 +1302,21 @@ admin.post(
   upload.single('icon'),
   ah(async (req, res) => {
     const title = cleanStr(req.body.title, 80);
+    const price = Number(req.body.price === undefined || req.body.price === '' ? 199 : req.body.price);
+    if (!(price > 0) || price > 1000000) {
+      if (req.file) safeUnlink(UPLOADS, req.file.filename);
+      return res.status(400).json({ error: 'Enter a valid tab pass price' });
+    }
     if (!title) {
       if (req.file) safeUnlink(UPLOADS, req.file.filename);
       return res.status(400).json({ error: 'Enter the tab name' });
     }
-    const r = await query('INSERT INTO topics(title,icon_url,sort_order,is_active) VALUES ($1,$2,$3,$4) RETURNING id', [
+    const r = await query('INSERT INTO topics(title,icon_url,sort_order,is_active,price) VALUES ($1,$2,$3,$4,$5) RETURNING id', [
       title,
       req.file ? '/uploads/' + req.file.filename : null,
       parseInt(req.body.sort_order, 10) || 0,
       req.body.is_active === undefined ? true : bool(req.body.is_active),
+      price,
     ]);
     res.json({ ok: true, id: r.rows[0].id });
   })
@@ -1271,6 +1329,11 @@ admin.put(
     const old = (await query('SELECT * FROM topics WHERE id=$1', [id])).rows[0];
     if (!old) return res.status(404).json({ error: 'Not found' });
     const title = cleanStr(req.body.title, 80);
+    const price = Number(req.body.price === undefined || req.body.price === '' ? 199 : req.body.price);
+    if (!(price > 0) || price > 1000000) {
+      if (req.file) safeUnlink(UPLOADS, req.file.filename);
+      return res.status(400).json({ error: 'Enter a valid tab pass price' });
+    }
     if (!title) return res.status(400).json({ error: 'Enter the tab name' });
     let icon = old.icon_url;
     if (req.file) {
@@ -1280,8 +1343,8 @@ admin.put(
       if (icon && icon.startsWith('/uploads/')) safeUnlink(UPLOADS, icon.slice(9));
       icon = null;
     }
-    await query('UPDATE topics SET title=$1, icon_url=$2, sort_order=$3, is_active=$4 WHERE id=$5', [
-      title, icon, parseInt(req.body.sort_order, 10) || 0, bool(req.body.is_active), id,
+    await query('UPDATE topics SET title=$1, icon_url=$2, sort_order=$3, is_active=$4, price=$5 WHERE id=$6', [
+      title, icon, parseInt(req.body.sort_order, 10) || 0, bool(req.body.is_active), price, id,
     ]);
     res.json({ ok: true });
   })

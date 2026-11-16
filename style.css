@@ -216,3 +216,17 @@ details p{margin-top:8px;color:var(--muted)}
 .tile small{color:#9db0e6;font-size:12px}
 .tile .ti{position:absolute;right:8px;bottom:8px;width:36px;height:36px;border-radius:10px;object-fit:cover;display:grid;place-items:center;font-weight:800;color:#1b1300;background:linear-gradient(135deg,var(--gold),#e39a14)}
 .tile.soon{opacity:.8}
+
+.tile .lock{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:rgba(245,185,66,.18);border:1px solid rgba(245,185,66,.55);display:grid;place-items:center}
+.tile .lock svg{width:13px;height:13px;fill:var(--gold)}
+.tile.unlocked small{color:#7ee2a8}
+.passband{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(135deg,rgba(245,185,66,.16),rgba(47,107,255,.16));border:1.5px solid rgba(245,185,66,.55);border-radius:16px;padding:14px 16px;margin-bottom:18px;color:#e4ebff}
+.passband b{color:#fff;font-size:17px}
+.passband p{margin:2px 0 0;font-size:13.5px;color:#b8c6ee}
+.lockbox{display:flex;flex-wrap:wrap;align-items:center;gap:14px;justify-content:space-between;background:#fff8e6;border:1.5px solid #f0cf7a;border-radius:16px;padding:16px 18px;margin-bottom:20px}
+.lockbox h3{font-size:18px;display:flex;gap:8px;align-items:center}
+.lockbox svg{width:20px;height:20px;fill:#c98a0a}
+.pcard.locked .pimg{filter:grayscale(.6) brightness(.8)}
+.pimg{position:relative}
+.pimg .lk{position:absolute;top:10px;right:10px;width:30px;height:30px;border-radius:50%;background:rgba(10,22,48,.85);display:grid;place-items:center}
+.pimg .lk svg{width:15px;height:15px;fill:var(--gold)}

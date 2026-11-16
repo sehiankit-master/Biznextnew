@@ -2,12 +2,17 @@
   await BN.ready;
   const esc = BN.esc;
 
-  // topic tiles
+  // topic tiles (locked until a tab pass or All Tabs Access is bought)
+  const LOCK = '<span class="lock" title="Locked"><svg viewBox="0 0 24 24"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V11a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 8V6a3 3 0 1 1 6 0v3H9z"/></svg></span>';
   const tiles = document.getElementById('topics');
   try {
-    const { topics } = await BN.api('/api/topics');
-    tiles.innerHTML = topics.length
-      ? topics.map((t) => `<a class="tile${t.items ? '' : ' soon'}" href="/topic.html?id=${t.id}"><b>${esc(t.title)}</b><small>${t.items ? t.items + (t.items === 1 ? ' item' : ' items') : 'Soon'}</small>${
+    const d = await BN.api('/api/topics');
+    document.getElementById('passBand').innerHTML = d.all_access
+      ? '<div class="passband"><div><b>All tabs unlocked</b><p>You have full access. Tap any tab to start.</p></div></div>'
+      : `<div class="passband"><div><b>Unlock everything for ${BN.inr(d.all_access_price)}</b><p>Or unlock a single tab with its own pass. A tab stays locked until you buy a pass.</p></div>
+         <a class="btn btn-gold" href="/checkout.html?type=all_access&id=0">Get All Tabs - ${BN.inr(d.all_access_price)}</a></div>`;
+    tiles.innerHTML = d.topics.length
+      ? d.topics.map((t) => `<a class="tile${t.items ? '' : ' soon'}${t.locked ? '' : ' unlocked'}" href="/topic.html?id=${t.id}">${t.locked ? LOCK : ''}<b>${esc(t.title)}</b><small>${t.locked ? BN.inr(t.price) + ' to unlock' : t.items ? t.items + (t.items === 1 ? ' item' : ' items') : 'Soon'}</small>${
           t.icon_url ? `<img class="ti" src="${esc(t.icon_url)}" alt="" loading="lazy">` : `<span class="ti">${esc(t.title.trim().charAt(0).toUpperCase())}</span>`}</a>`).join('')
       : '<div class="empty" style="grid-column:1/-1;color:#aebce6">Topics will appear here soon.</div>';
   } catch (e) { tiles.innerHTML = ''; }

@@ -43,9 +43,9 @@
       ${feats ? `<h3 style="margin-top:14px;font-size:16px">Features</h3><ul style="margin:6px 0 0 20px">${feats}</ul>` : ''}
       <div class="notes"><b>Reselling rights:</b> ${p.resell_allowed ? 'Available for this product.' : 'Not available — personal / own business use only.'}
         ${esc(p.resell_info || '')}</div>
-      <div class="pprice" style="margin:10px 0">${p.is_free ? 'Free' : BN.inr(p.price)}</div>
+      <div class="pprice" style="margin:10px 0">${p.is_free ? 'Free sample' : (p.topic_id && Number(p.price) <= 0) ? 'Tab pass' : BN.inr(p.price)}</div>
       <div class="actions">
-        ${p.is_free && p.topic_id ? `<a class="btn btn-gold" href="/topic.html?id=${p.topic_id}">Open free</a>` : `<a class="btn btn-primary" href="/checkout.html?type=product&id=${p.id}">Buy Now</a>`}
+        ${(p.topic_id && (p.is_free || Number(p.price) <= 0)) ? `<a class="btn btn-gold" href="/topic.html?id=${p.topic_id}">Open in tab</a>` : `<a class="btn btn-primary" href="/checkout.html?type=product&id=${p.id}">Buy Now</a>`}
         ${p.preview_url ? `<a class="btn btn-outline" href="${esc(p.preview_url)}" target="_blank" rel="noopener noreferrer">Preview</a>` : ''}
         <button class="btn btn-outline" id="closeModal">Close</button>
       </div>
