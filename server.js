@@ -2,6 +2,12 @@
 // Needs these packages (already in package.json on your GitHub repo):
 // express pg bcryptjs cookie-parser dotenv express-rate-limit helmet jsonwebtoken multer nodemailer
 try { require('dotenv').config(); } catch (_) {}
+// Settings can also live in ~/.nextbiz.env (outside the deploy folder, so a new deploy never wipes them)
+try { require('dotenv').config({ path: require('path').join(require('os').homedir(), '.nextbiz.env') }); } catch (_) {}
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL is missing. Put it in .env (or ~/.nextbiz.env): DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME');
+  process.exit(1);
+}
 const express = require('express');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
