@@ -3,10 +3,7 @@
   "version": "1.0.0",
   "description": "BIZNEXT DIGITAL COMPANY - digital products store with plans, Razorpay + manual UPI/QR payments, dashboards and admin panel",
   "main": "server.js",
-  "scripts": {
-  "start": "node server.js"
-}
-
+  "scripts": { "start": "node server.js", "build": "node --check server.js" },
   "engines": { "node": ">=18" },
   "dependencies": {
     "bcryptjs": "^2.4.3",
