@@ -2,10 +2,13 @@ services:
   - type: web
     name: biznext
     runtime: node
-    plan: free
+    plan: starter
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/settings
+    domains:
+      - nextbiz.in
+      - www.nextbiz.in
     envVars:
       - key: NODE_ENV
         value: production
@@ -37,13 +40,3 @@ services:
 databases:
   - name: biznext-db
     plan: free
-services:
-  - type: web
-    name: aapki-node-app
-    runtime: node
-    buildCommand: npm install
-    startCommand: node index.js # ya aapka start command
-    domains:
-      - nextbiz.in
-      - www.nextbiz.in
-      
