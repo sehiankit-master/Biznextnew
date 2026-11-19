@@ -37,3 +37,13 @@ services:
 databases:
   - name: biznext-db
     plan: free
+services:
+  - type: web
+    name: aapki-node-app
+    runtime: node
+    buildCommand: npm install
+    startCommand: node index.js # ya aapka start command
+    domains:
+      - yourdomain.com
+      - www.yourdomain.com
+      
