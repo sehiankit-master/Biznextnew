@@ -44,6 +44,6 @@ services:
     buildCommand: npm install
     startCommand: node index.js # ya aapka start command
     domains:
-      - yourdomain.com
-      - www.yourdomain.com
+      - nextbiz.in
+      - www.nextbiz.in
       
