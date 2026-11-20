@@ -196,7 +196,6 @@ app.use((req, res, next) => {
   next();
 });
 app.use(rateLimit({ windowMs: 60 * 1000, limit: 600, standardHeaders: true, legacyHeaders: false, skip: (req) => req.path === '/api/webhooks/razorpay' }));
-app.get('/robots.txt', (req, res) => res.type('text/plain').send('User-agent: *\nDisallow: /api/\nDisallow: /admin.html\nDisallow: /dashboard.html\nDisallow: /checkout.html\n'));
 app.use(cookieParser());
 
 // Razorpay webhook needs the RAW body for signature verification -> must be before express.json()
