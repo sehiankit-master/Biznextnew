@@ -6,6 +6,12 @@ services:
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/settings
+    # OPTIONAL - permanent disk so big videos / e-books / software files are never lost (about 1.25 USD per month for 5 GB).
+    # To turn it on, remove the # at the start of the next 4 lines and the 2 lines under envVars marked DATA_DIR, then commit.
+    # disk:
+    #   name: biznext-data
+    #   mountPath: /var/data
+    #   sizeGB: 5
     domains:
       - nextbiz.in
       - www.nextbiz.in
@@ -36,6 +42,8 @@ services:
         sync: false
       - key: BASE_URL
         sync: false
+      # - key: DATA_DIR   (DATA_DIR: remove the # on this line and the next)
+      #   value: /var/data
 
 databases:
   - name: biznext-db
