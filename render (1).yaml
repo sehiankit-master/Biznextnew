@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: biznext
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/settings
+    # OPTIONAL - permanent disk so big videos / e-books / software files are never lost (about 1.25 USD per month for 5 GB).
+    # To turn it on, remove the # at the start of the next 4 lines and the 2 lines under envVars marked DATA_DIR, then commit.
+    # disk:
+    #   name: biznext-data
+    #   mountPath: /var/data
+    #   sizeGB: 5
+    domains:
+      - nextbiz.in
+      - www.nextbiz.in
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: biznext-db
+          property: connectionString
+      - key: DB_SSL
+        value: "false"
+      - key: REQUIRE_EMAIL_VERIFY
+        value: "false"
+      - key: ADMIN_NAME
+        value: Super Admin
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: BASE_URL
+        sync: false
+      # - key: DATA_DIR   (DATA_DIR: remove the # on this line and the next)
+      #   value: /var/data
+
+databases:
+  - name: biznext-db
+    plan: free
