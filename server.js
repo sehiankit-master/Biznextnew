@@ -2905,3 +2905,86 @@ if (require.main === module) {
     .catch((e) => { logError(e); console.error('Startup failed:', e.message); process.exit(1); });
 }
 module.exports = app;
+// --- SMM Panel API Routes Start ---
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+const {
+  getBalance,
+  getServices,
+  placeOrder,
+  checkOrderStatus,
+  refillOrder
+} = require('./smmService');
+
+// 1. SMM Balance & Connection Test karne ke liye
+app.get('/api/smm/test', async (req, res) => {
+  try {
+    const balance = await getBalance();
+    res.json({ success: true, balance });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 2. Provider ki saari Services aur Service IDs dekhne ke liye
+app.get('/api/smm/services', async (req, res) => {
+  try {
+    const services = await getServices();
+    res.json({ success: true, services });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 3. Naya Order (Followers / Likes / Views) bhejne ke liye
+app.post('/api/smm/order', async (req, res) => {
+  try {
+    const { serviceId, link, quantity } = req.body;
+
+    if (!serviceId || !link || !quantity) {
+      return res.status(400).json({
+        success: false,
+        error: 'Service ID, Link aur Quantity teeno zaroori hain'
+      });
+    }
+
+    const result = await placeOrder({ serviceId, link, quantity });
+
+    if (result && result.order) {
+      return res.json({
+        success: true,
+        message: 'Order successfully placed!',
+        smmOrderId: result.order
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: result.error || 'Order lagane me samasya aayi'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 4. Order Status check karne ke liye
+app.get('/api/smm/status/:orderId', async (req, res) => {
+  try {
+    const status = await checkOrderStatus(req.params.orderId);
+    res.json({ success: true, status });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 5. Order Refill karne ke liye
+app.post('/api/smm/refill/:orderId', async (req, res) => {
+  try {
+    const refill = await refillOrder(req.params.orderId);
+    res.json({ success: true, refill });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+// --- SMM Panel API Routes End ---
